@@ -41,7 +41,7 @@ AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
 
 Mock: two numbers in the prompt → `add` tool; otherwise echo. Default prompt is `What is 17 plus 25?`.
 
-Tuition is an unmodified `cl-stack-systems` import (not on OCI yet). Clone `atgreen/cl-tuition` v2.3.0 and set `TUITION_PATH` or put it on `CL_SOURCE_REGISTRY`.
+Tuition is an unmodified `cl-stack-systems` import (`tuition` 2.3.0). Until GHCR has it, clone `atgreen/cl-tuition` v2.3.0 and set `TUITION_PATH` (or sibling `cl-tuition/` / `/tmp/cl-tuition`). Dummy LM Studio token `lm-studio` is treated as unset.
 
 `STATE_DELTA` / snapshots are wave-1 no-ops.
 
