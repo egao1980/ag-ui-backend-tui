@@ -191,11 +191,16 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
   (and (interactive-stream-p *query-io*)
        (interactive-stream-p *standard-output*)))
 
+(defun %ensure-off-loop-http ()
+  "Generate runs on a submit worker — rebind the let-bound HTTP backend."
+  (pushnew 'http-protocol:*http-backend* agent:*off-loop-specials*))
+
 (defun %backend-from-env ()
   (let ((name (string-downcase (or (uiop:getenv "AG_UI_TUI_BACKEND") "mock"))))
     (cond
       ((member name '("openai" "lmstudio") :test #'string=)
        (asdf:load-system "llm-protocol-openai")
+       (%ensure-off-loop-http)
        (funcall (find-symbol "MAKE-OPENAI-COMPAT-BACKEND"
                              (find-package '#:llm-protocol-openai))))
       (t :mock))))
