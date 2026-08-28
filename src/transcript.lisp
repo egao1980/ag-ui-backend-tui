@@ -147,7 +147,7 @@
 (defun render-transcript (tr)
   "Plain-text view of TR for tests / fallback paint. No tty."
   (with-output-to-string (s)
-    (format s "status=~a" (transcript-status tr))
+    (format s "status=~(~a~)" (transcript-status tr))
     (when (transcript-step tr)
       (format s " step=~a" (transcript-step tr)))
     (when (transcript-error-message tr)
