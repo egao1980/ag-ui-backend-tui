@@ -23,6 +23,8 @@ Loop ownership when painting: tuition `tui:run` on the main thread; `event-proto
 
 `ag-ui-backend-tui/demo` wires `ai-agent-protocol` → `/ag-ui` encoder → this sink.
 
+The script binds the workspace tree (no `CL_SOURCE_REGISTRY` required) and loads `../.env` when present.
+
 ```bash
 # line mode (no tty / pipes) — mock agent, tool + text deltas
 AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
