@@ -27,6 +27,24 @@
   :components ((:file "tuition-package")
                (:file "program")))
 
+(defsystem "ag-ui-backend-tui/demo"
+  :version "0.1.0"
+  :description "Interactive AG-UI TUI demo (ai-agent → encoder → tuition)"
+  :author "egao1980"
+  :license "MIT"
+  :depends-on ("ag-ui-backend-tui"
+               "ag-ui-backend-tui/tuition"
+               "ai-agent-protocol"
+               "ai-agent-protocol/ag-ui"
+               "llm-protocol"
+               "json-protocol"
+               "json-backend-jzon"
+               "bordeaux-threads")
+  :serial t
+  :pathname "src"
+  :components ((:file "demo-package")
+               (:file "demo")))
+
 (defsystem "ag-ui-backend-tui/tests"
   :depends-on ("ag-ui-backend-tui" "rove")
   :pathname "tests"

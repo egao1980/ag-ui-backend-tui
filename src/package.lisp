@@ -25,6 +25,7 @@
            #:transcript-tool-result
            #:transcript-tool-status
            #:apply-ag-ui-event
+           #:transcript-add-user
            #:render-transcript
            #:with-tui-runtime))
 

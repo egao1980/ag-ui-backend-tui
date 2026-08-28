@@ -65,6 +65,13 @@
              (ag-ui:make-messages-snapshot-event :messages '()))))
     (ok (eq :idle (transcript-status tr)))))
 
+(deftest add-user-line
+  (let ((tr (make-transcript)))
+    (transcript-add-user tr "hi")
+    (ok (= 1 (length (transcript-messages tr))))
+    (ok (equal "user" (transcript-message-role (first (transcript-messages tr)))))
+    (ok (search "you> hi" (render-transcript tr)))))
+
 (deftest step-name
   (let ((tr (%fold
              (ag-ui:make-step-started-event :step-name "step-1")

@@ -19,6 +19,28 @@ No `tui-protocol`. Tuition is a paint backend (`ag-ui-backend-tui/tuition`), not
 
 Loop ownership when painting: tuition `tui:run` on the main thread; `event-protocol:run` (libuv) on a side thread; hop events with `tui:send` of `ag-ui-event-msg`. Never `http:request` on the tuition thread. `with-tui-runtime` binds libuv + `http-backend-async`.
 
+## Demo
+
+`ag-ui-backend-tui/demo` wires `ai-agent-protocol` → `/ag-ui` encoder → this sink.
+
+```bash
+# line mode (no tty / pipes) — mock agent, tool + text deltas
+AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
+
+# drip each event
+AG_UI_TUI_VERBOSE=1 AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
+
+# interactive tuition TUI (needs a tty + atgreen/cl-tuition v2.3.0)
+ros -l scripts/demo.lisp
+
+# live LM Studio
+AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
+```
+
+Mock: two numbers in the prompt → `add` tool; otherwise echo. Default prompt is `What is 17 plus 25?`.
+
+Tuition is an unmodified `cl-stack-systems` import (not on OCI yet). Clone `atgreen/cl-tuition` v2.3.0 and set `TUITION_PATH` or put it on `CL_SOURCE_REGISTRY`.
+
 `STATE_DELTA` / snapshots are wave-1 no-ops.
 
 Tracks [cl-stack#187](https://github.com/egao1980/cl-stack/issues/187).

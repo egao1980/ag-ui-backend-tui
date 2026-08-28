@@ -144,6 +144,17 @@
   (declare (ignore ev))
   tr)
 
+(defun transcript-add-user (tr text)
+  "Local user line (not an AG-UI event). TUI / demo call this on submit."
+  (setf (transcript-messages tr)
+        (append (transcript-messages tr)
+                (list (make-transcript-message
+                       :id (format nil "user-~a" (length (transcript-messages tr)))
+                       :role "user"
+                       :text (or text "")
+                       :ended-p t))))
+  tr)
+
 (defun render-transcript (tr)
   "Plain-text view of TR for tests / fallback paint. No tty."
   (with-output-to-string (s)
