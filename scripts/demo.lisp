@@ -7,8 +7,9 @@
 ;;;; Interactive (tty):  ros -l scripts/demo.lisp
 ;;;; Live LM Studio:     AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
 ;;;;
-;;;; Does not need CL_SOURCE_REGISTRY — binds the workspace tree from this file.
-;;;; Tuition: OCI (once published) / TUITION_PATH / sibling cl-tuition / /tmp/cl-tuition.
+;;;; Does not need CL_SOURCE_REGISTRY — registers first-party sibling dirs.
+;;;; Do not :tree the workspace (ws-backend-websocket-driver is its own repo).
+;;;; Tuition: ghcr.io/egao1980/cl-systems/tuition:2.3.0 / TUITION_PATH / sibling / /tmp.
 
 (setf *debugger-hook*
       (lambda (c h)
@@ -52,27 +53,33 @@
 (defparameter *%first-party-dirs*
   '("ag-ui-protocol" "ag-ui-backend-tui" "ai-agent-protocol"
     "llm-protocol" "llm-protocol-openai" "json-protocol"
-    "event-protocol" "event-backend-libuv" "http-protocol"
-    "http-backend-async" "io-protocol" "log-protocol"
-    "serdes-protocol" "schema-protocol" "schema-protocol-json"))
+    "event-protocol" "event-backend-libuv" "cl-stack-executors"
+    "http-protocol" "http-backend-async" "http-encoding-chipz"
+    "ws-protocol" "sse-protocol" "quri" "cl-idna"
+    "io-protocol" "log-protocol" "serdes-protocol"
+    "schema-protocol" "schema-protocol-json"))
+
+(defun %first-party-dirs ()
+  (let ((ws (%workspace-root)))
+    (loop for name in *%first-party-dirs*
+          for dir = (probe-file (merge-pathnames (format nil "~a/" name) ws))
+          when dir
+            collect (uiop:ensure-directory-pathname dir))))
 
 (defun %load-sibling-asds ()
-  "Belt-and-suspenders: tree walk can miss a sibling if inherit-configuration is stale."
-  (let ((ws (%workspace-root)))
-    (dolist (name *%first-party-dirs*)
-      (let ((dir (merge-pathnames (format nil "~a/" name) ws)))
-        (when (uiop:directory-exists-p dir)
-          (dolist (asd (directory (merge-pathnames "*.asd" dir)))
-            (asdf:load-asd asd)))))))
+  (dolist (dir (%first-party-dirs))
+    (dolist (asd (directory (merge-pathnames "*.asd" dir)))
+      (asdf:load-asd asd))))
 
 (defun %bind-workspace-asdf ()
-  "First-party siblings live in the workspace tree. Do not require CL_SOURCE_REGISTRY."
+  "First-party siblings only. Product WS backend is not colocated in ws-protocol."
   (let ((ws (%workspace-root))
-        (repo (%repo-root)))
+        (repo (%repo-root))
+        (dirs (%first-party-dirs)))
     (asdf:initialize-source-registry
      `(:source-registry
        (:directory ,repo)
-       (:tree ,ws)
+       ,@(mapcar (lambda (d) `(:directory ,d)) dirs)
        ,@(mapcar (lambda (d)
                    `(:directory ,(uiop:ensure-directory-pathname d)))
                  (%tuition-dirs))
@@ -81,6 +88,9 @@
     (format *error-output* "~&; demo: workspace=~a~%" ws)
     (unless (asdf:find-system "ag-ui-protocol" nil)
       (error "ag-ui-protocol not found under ~a — expected a cl-workspace checkout."
+             ws))
+    (unless (asdf:find-system "ws-protocol" nil)
+      (error "ws-protocol not found under ~a (required by http-backend-async)."
              ws))))
 
 (defun %register-tuition ()

@@ -23,7 +23,7 @@ Loop ownership when painting: tuition `tui:run` on the main thread; `event-proto
 
 `ag-ui-backend-tui/demo` wires `ai-agent-protocol` → `/ag-ui` encoder → this sink.
 
-The script binds the workspace tree (no `CL_SOURCE_REGISTRY` required) and loads `../.env` when present.
+The script registers first-party sibling dirs (no `CL_SOURCE_REGISTRY`, no workspace `:tree` — `ws-backend-websocket-driver` is its own repo) and loads `../.env` when present.
 
 ```bash
 # line mode (no tty / pipes) — mock agent, tool + text deltas
