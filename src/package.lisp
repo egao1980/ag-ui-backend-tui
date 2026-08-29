@@ -26,6 +26,8 @@
            #:transcript-tool-status
            #:apply-ag-ui-event
            #:transcript-add-user
+           #:transcript-ag-ui-messages
+           #:make-run-agent-input-from-transcript
            #:render-transcript
            #:with-tui-runtime
            #:tui-error-log-path

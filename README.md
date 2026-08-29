@@ -5,6 +5,8 @@ AG-UI **sink**: fold typed events into a transcript. Paint is optional.
 Consumes **AG-UI events only** — never `ai-agent-protocol` `:part` / `agent-run`.
 No `tui-protocol`. Tuition is a paint backend (`ag-ui-backend-tui/tuition`), not the reducer.
 
+Reusable as a **client-side sink + history**, not a wire client: no `run-agent`, no HTTP/SSE transport. Fold events into a `transcript`, paint with `/tuition`, resubmit with `transcript-ag-ui-messages` / `make-run-agent-input-from-transcript`. The demo (`ag-ui-backend-tui/demo`) is product glue (agent + encoder), not the library.
+
 ```lisp
 (asdf:load-system "ag-ui-backend-tui")
 

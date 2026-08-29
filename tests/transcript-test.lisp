@@ -65,6 +65,42 @@
              (ag-ui:make-messages-snapshot-event :messages '()))))
     (ok (eq :idle (transcript-status tr)))))
 
+(deftest transcript-history-messages
+  (let ((tr (make-transcript)))
+    (transcript-add-user tr "hi")
+    (apply-ag-ui-event tr (ag-ui:make-text-message-start-event
+                           :message-id "a1" :role "assistant"))
+    (apply-ag-ui-event tr (ag-ui:make-text-message-content-event
+                           :message-id "a1" :delta "hello"))
+    (apply-ag-ui-event tr (ag-ui:make-text-message-end-event :message-id "a1"))
+    (let ((msgs (transcript-ag-ui-messages tr)))
+      (ok (= 2 (length msgs)))
+      (ok (equal "user" (ag-ui:ag-ui-message-role (first msgs))))
+      (ok (equal "hi" (ag-ui:ag-ui-message-content (first msgs))))
+      (ok (equal "assistant" (ag-ui:ag-ui-message-role (second msgs))))
+      (ok (equal "hello" (ag-ui:ag-ui-message-content (second msgs)))))))
+
+(deftest transcript-history-tools
+  (let ((tr (make-transcript)))
+    (transcript-add-user tr "1+2")
+    (dolist (ev (list
+                 (ag-ui:make-tool-call-start-event :tool-call-id "c1" :tool-call-name "sum")
+                 (ag-ui:make-tool-call-args-event :tool-call-id "c1" :delta "{\"a\":1}")
+                 (ag-ui:make-tool-call-end-event :tool-call-id "c1")
+                 (ag-ui:make-tool-call-result-event :message-id "r1"
+                                                    :tool-call-id "c1"
+                                                    :content "3")
+                 (ag-ui:make-text-message-content-event :message-id "a" :delta "3")))
+      (apply-ag-ui-event tr ev))
+    (let* ((msgs (transcript-ag-ui-messages tr))
+           (roles (mapcar #'ag-ui:ag-ui-message-role msgs)))
+      (ok (equal '("user" "assistant" "tool" "assistant") roles))
+      (ok (equal "c1" (ag-ui:ag-ui-message-tool-call-id (third msgs))))
+      (ok (equal "3" (ag-ui:ag-ui-message-content (third msgs))))
+      (let ((input (make-run-agent-input-from-transcript tr :run-id "r2")))
+        (ok (equal "r2" (ag-ui:run-agent-input-run-id input)))
+        (ok (= 4 (length (ag-ui:run-agent-input-messages input))))))))
+
 (deftest add-user-line
   (let ((tr (make-transcript)))
     (transcript-add-user tr "hi")

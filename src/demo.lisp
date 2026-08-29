@@ -112,11 +112,14 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
       (add-handler args))
     agent))
 
-(defun make-demo-input (text &key (thread "t1") (run "r1"))
-  (ag-ui:make-run-agent-input
-   :thread-id thread :run-id run
-   :messages (list (ag-ui:make-ag-ui-message
-                    :id "m-user" :role "user" :content text))))
+(defun make-demo-input (source &key (thread "t1") (run "r1"))
+  "SOURCE is a transcript (full thread) or a user string."
+  (if (transcript-p source)
+      (make-run-agent-input-from-transcript source :thread-id thread :run-id run)
+      (ag-ui:make-run-agent-input
+       :thread-id thread :run-id run
+       :messages (list (ag-ui:make-ag-ui-message
+                        :id "m-user" :role "user" :content source)))))
 
 (defun run-demo-line (text &key agent on-event)
   "Drive one prompt on the event loop. Returns (values render transcript).
@@ -129,7 +132,7 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
            (err nil))
       (transcript-add-user tr text)
       (ag-ui-enc:start-ag-ui-agent-run
-       agent (make-demo-input text)
+       agent (make-demo-input tr)
        :on-event (lambda (ev)
                    (apply-ag-ui-event tr ev)
                    (when on-event (funcall on-event ev tr)))
@@ -167,14 +170,15 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
              (trc *trace-output*)
              (loop-thread nil))
         (setf (paint:model-on-submit model)
-              (lambda (text mdl)
-                (declare (ignore mdl))
-                (incf n)
-                (event:wake-call
-                 eb el
-                 (lambda ()
-                   (ag-ui-enc:start-ag-ui-agent-run
-                    agent (make-demo-input text :run (format nil "r~a" n))
+            (lambda (text mdl)
+              (declare (ignore text))
+              (incf n)
+              (event:wake-call
+               eb el
+               (lambda ()
+                 (ag-ui-enc:start-ag-ui-agent-run
+                  agent (make-demo-input (paint:model-transcript mdl)
+                                         :run (format nil "r~a" n))
                     :on-event (lambda (ev)
                                 (paint:send-ag-ui-event program ev))
                     :callback (lambda (run) (declare (ignore run)))
