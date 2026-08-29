@@ -152,54 +152,55 @@
                "name" (or (transcript-tool-name tool) "")
                "arguments" (or (transcript-tool-arguments tool) "{}"))))
 
+(defun %flush-completed-tools (tr emitted out)
+  (dolist (id (transcript-tool-order tr) out)
+    (let ((tool (gethash id (transcript-tools tr))))
+      (when (and tool
+                 (not (gethash id emitted))
+                 (eq (transcript-tool-status tool) :result))
+        (setf (gethash id emitted) t)
+        (push (ag-ui:make-ag-ui-message
+               :id (format nil "asst-~a" id)
+               :role "assistant"
+               :tool-calls (vector (%tool-call-hash tool)))
+              out)
+        (push (ag-ui:make-ag-ui-message
+               :id (format nil "tool-~a" id)
+               :role "tool"
+               :name (transcript-tool-name tool)
+               :tool-call-id id
+               :content (or (transcript-tool-result tool) ""))
+              out)))))
+
 (defun transcript-ag-ui-messages (tr)
   "Full thread as AG-UI messages (user/assistant text + completed tool triad).
    Clients send this as `run-agent-input.messages` on every turn."
   (let ((emitted (make-hash-table :test #'equal))
         (out '())
         (seen-p nil))
-    (flet ((flush-tools ()
-             (dolist (id (transcript-tool-order tr))
-               (let ((tool (gethash id (transcript-tools tr))))
-                 (when (and tool
-                            (not (gethash id emitted))
-                            (eq (transcript-tool-status tool) :result))
-                   (setf (gethash id emitted) t)
-                   (push (ag-ui:make-ag-ui-message
-                          :id (format nil "asst-~a" id)
-                          :role "assistant"
-                          :tool-calls (vector (%tool-call-hash tool)))
-                         out)
-                   (push (ag-ui:make-ag-ui-message
-                          :id (format nil "tool-~a" id)
-                          :role "tool"
-                          :name (transcript-tool-name tool)
-                          :tool-call-id id
-                          :content (or (transcript-tool-result tool) ""))
-                         out))))))
-      (dolist (msg (transcript-messages tr))
-        (let ((role (transcript-message-role msg))
-              (text (or (transcript-message-text msg) "")))
-          (cond
-            ((equal role "user")
-             (when seen-p (flush-tools))
-             (when (plusp (length text))
-               (push (ag-ui:make-ag-ui-message
-                      :id (transcript-message-id msg)
-                      :role "user"
-                      :content text)
-                     out)))
-            (t
-             (flush-tools)
-             (when (plusp (length text))
-               (push (ag-ui:make-ag-ui-message
-                      :id (transcript-message-id msg)
-                      :role (or role "assistant")
-                      :content text)
-                     out))))
-        (setf seen-p t))
-      (flush-tools)
-      (nreverse out))))
+    (dolist (msg (transcript-messages tr))
+      (let ((role (transcript-message-role msg))
+            (text (or (transcript-message-text msg) "")))
+        (cond
+          ((equal role "user")
+           (when seen-p
+             (setf out (%flush-completed-tools tr emitted out)))
+           (when (plusp (length text))
+             (push (ag-ui:make-ag-ui-message
+                    :id (transcript-message-id msg)
+                    :role "user"
+                    :content text)
+                   out)))
+          (t
+           (setf out (%flush-completed-tools tr emitted out))
+           (when (plusp (length text))
+             (push (ag-ui:make-ag-ui-message
+                    :id (transcript-message-id msg)
+                    :role (or role "assistant")
+                    :content text)
+                   out))))
+      (setf seen-p t))
+    (nreverse (%flush-completed-tools tr emitted out))))
 
 (defun make-run-agent-input-from-transcript (tr &key (thread-id "t1") (run-id "r1"))
   "Reusable client helper: transcript → `run-agent-input` with full history."
