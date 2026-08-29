@@ -46,7 +46,7 @@
   :pathname "src"
   :components ((:file "demo-package")
                (:file "demo"))
-  :in-order-to ((test-op (test-op "ag-ui-backend-tui/demo/tests")))))
+  :in-order-to ((test-op (test-op "ag-ui-backend-tui/demo/tests"))))
 
 (defsystem "ag-ui-backend-tui/tests"
   :depends-on ("ag-ui-backend-tui" "rove")

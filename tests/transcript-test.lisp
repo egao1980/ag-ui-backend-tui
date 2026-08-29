@@ -137,7 +137,7 @@
       (ok (equal "3" (ag-ui:ag-ui-message-content (third msgs))))
       (let ((input (make-run-agent-input-from-transcript tr :run-id "r2")))
         (ok (equal "r2" (ag-ui:run-agent-input-run-id input)))
-        (ok (= 4 (length (ag-ui:run-agent-input-messages input)))))))
+        (ok (= 4 (length (ag-ui:run-agent-input-messages input))))))))
 
 (deftest run-agent-input-carries-state
   (let ((tr (%fold

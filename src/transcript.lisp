@@ -70,7 +70,7 @@
   (:documentation "Fold EVENT into TRANSCRIPT. Returns TRANSCRIPT.
    Display methods handle text/tools/reasoning/status. Every event also
    folds into the client agent-state (STATE_SNAPSHOT/DELTA, interrupts).
-   Unknown event classes are display no-ops.")))
+   Unknown event classes are display no-ops."))
 
 (defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:run-started-event))
   (setf (transcript-status tr) :running
@@ -317,4 +317,4 @@
       (let ((msg (ag-ui:event-field int 'ag-ui::message)))
         (when (and msg (plusp (length msg)))
           (format s " ~a" msg)))
-      (terpri s)))))
+      (terpri s))))
