@@ -13,6 +13,7 @@
            #:demo-session
            #:demo-session-agent
            #:demo-session-last-run
+           #:close-demo-session
            #:make-demo-input
            #:make-resume-input
            #:resume-verdict

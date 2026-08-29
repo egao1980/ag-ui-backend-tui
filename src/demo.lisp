@@ -145,6 +145,7 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
 
 (defclass demo-session ()
   ((agent :initarg :agent :accessor demo-session-agent)
+   (backend :initarg :backend :accessor demo-session-backend :initform nil)
    (last-run :initform nil :accessor demo-session-last-run)
    (thread-id :initarg :thread-id :accessor demo-session-thread-id
               :initform "t1")
@@ -155,8 +156,20 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
   (make-instance 'demo-session
                  :agent (or agent (make-demo-agent :backend (or backend :mock)
                                                    :approve approve))
+                 :backend backend
                  :thread-id thread-id
                  :settings settings))
+
+(defun close-demo-session (session)
+  "Release native engines (llama.cpp Metal aborts if we just exit)."
+  (let ((backend (and session (demo-session-backend session)))
+        (pkg (find-package '#:llm-backend-llama-cpp)))
+    (when (and pkg backend (not (keywordp backend)))
+      (let ((class (find-symbol "LLAMA-CPP-BACKEND" pkg))
+            (close (find-symbol "CLOSE-LLAMA-CPP-BACKEND" pkg)))
+        (when (and class close (typep backend class))
+          (ignore-errors (funcall close backend))))))
+  session)
 
 (defun %next-run-id (session &optional suffix)
   (incf (demo-session-n session))
@@ -351,12 +364,13 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
   (pushnew 'http-protocol:*http-backend* agent:*off-loop-specials*))
 
 (defun %demo-settings ()
-  (llm:make-llm-settings
-   :max-tokens (%parse-int-env "AG_UI_TUI_MAX_TOKENS" 128)
-   :temperature (let ((v (%env "AG_UI_TUI_TEMPERATURE")))
-                  (or (and v (let ((*read-eval* nil))
-                               (ignore-errors (read-from-string v))))
-                      0.0))))
+  (agent:make-agent-settings
+   :llm (llm:make-llm-settings
+         :max-tokens (%parse-int-env "AG_UI_TUI_MAX_TOKENS" 128)
+         :temperature (let ((v (%env "AG_UI_TUI_TEMPERATURE")))
+                        (or (and v (let ((*read-eval* nil))
+                                     (ignore-errors (read-from-string v))))
+                            0.0)))))
 
 (defun %chat-gguf-p (path)
   (let ((n (string-downcase (file-namestring path))))
@@ -432,20 +446,22 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
                           (if (%tools-p backend)
                               "What is 17 plus 25?"
                               "Say hello in five words.")))))
-    (if line
-        (let ((verbose (%env "AG_UI_TUI_VERBOSE")))
-          (multiple-value-bind (view tr sess)
-              (run-demo-line prompt
-                             :session session
-                             :auto-approve (if (%env "AG_UI_TUI_AUTO_APPROVE")
-                                               (%env-flag "AG_UI_TUI_AUTO_APPROVE")
-                                               t)
-                             :on-event (and verbose
-                                            (lambda (ev transcript)
-                                              (declare (ignore ev))
-                                              (format t "~%~a~%" (render-transcript transcript))
-                                              (force-output))))
-            (declare (ignore tr sess))
-            (format t "~a~%" view)
-            view))
-        (run-demo-tui :session session :prompt prompt))))
+    (unwind-protect
+         (if line
+             (let ((verbose (%env "AG_UI_TUI_VERBOSE")))
+               (multiple-value-bind (view tr sess)
+                   (run-demo-line prompt
+                                  :session session
+                                  :auto-approve (if (%env "AG_UI_TUI_AUTO_APPROVE")
+                                                    (%env-flag "AG_UI_TUI_AUTO_APPROVE")
+                                                    t)
+                                  :on-event (and verbose
+                                                 (lambda (ev transcript)
+                                                   (declare (ignore ev))
+                                                   (format t "~%~a~%" (render-transcript transcript))
+                                                   (force-output))))
+                 (declare (ignore tr sess))
+                 (format t "~a~%" view)
+                 view))
+             (run-demo-tui :session session :prompt prompt))
+      (close-demo-session session))))
