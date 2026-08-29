@@ -36,6 +36,7 @@ AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 AG_UI_TUI_VERBOSE=1 AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 
 # interactive tuition TUI (needs a tty + atgreen/cl-tuition v2.3.0)
+# WARN/trace → ./ag-ui-tui.error.log (or AG_UI_TUI_ERROR_LOG)
 ros -l scripts/demo.lisp
 
 # live LM Studio

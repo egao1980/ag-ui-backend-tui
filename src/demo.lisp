@@ -146,46 +146,58 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
       (when err (error err))
       (values (render-transcript tr) tr))))
 
+(defun %ensure-off-loop-stderr ()
+  "Submit workers do not inherit the TUI error-log binding unless captured."
+  (pushnew 'cl:*error-output* agent:*off-loop-specials*)
+  (pushnew 'cl:*trace-output* agent:*off-loop-specials*))
+
 (defun run-demo-tui (&key agent prompt)
-  "Tuition on this thread; libuv event:run on a side thread."
+  "Tuition on this thread; libuv event:run on a side thread.
+   Redirects *ERROR-OUTPUT* to the TUI error log on every hop thread."
   (with-tui-runtime
-    (let* ((eb event:*event-backend*)
-           (el event:*event-loop*)
-           (agent (or agent (make-demo-agent)))
-           (model (paint:make-ag-ui-tui-model :seed-prompt prompt))
-           (program (tui:make-program model))
-           (n 0)
-           (loop-thread nil))
-      (setf (paint:model-on-submit model)
-            (lambda (text mdl)
-              (declare (ignore mdl))
-              (incf n)
-              (event:wake-call
-               eb el
+    (with-tui-error-log ()
+      (%ensure-off-loop-stderr)
+      (let* ((eb event:*event-backend*)
+             (el event:*event-loop*)
+             (agent (or agent (make-demo-agent)))
+             (model (paint:make-ag-ui-tui-model :seed-prompt prompt))
+             (program (tui:make-program model))
+             (n 0)
+             (err *error-output*)
+             (trc *trace-output*)
+             (loop-thread nil))
+        (setf (paint:model-on-submit model)
+              (lambda (text mdl)
+                (declare (ignore mdl))
+                (incf n)
+                (event:wake-call
+                 eb el
+                 (lambda ()
+                   (ag-ui-enc:start-ag-ui-agent-run
+                    agent (make-demo-input text :run (format nil "r~a" n))
+                    :on-event (lambda (ev)
+                                (paint:send-ag-ui-event program ev))
+                    :callback (lambda (run) (declare (ignore run)))
+                    :error-callback
+                    (lambda (c)
+                      (paint:send-ag-ui-event
+                       program
+                       (ag-ui:make-run-error-event
+                        :message (princ-to-string c)))))))))
+        (setf loop-thread
+              (bt:make-thread
                (lambda ()
-                 (ag-ui-enc:start-ag-ui-agent-run
-                  agent (make-demo-input text :run (format nil "r~a" n))
-                  :on-event (lambda (ev)
-                              (paint:send-ag-ui-event program ev))
-                  :callback (lambda (run) (declare (ignore run)))
-                  :error-callback
-                  (lambda (c)
-                    (paint:send-ag-ui-event
-                     program
-                     (ag-ui:make-run-error-event
-                      :message (princ-to-string c)))))))))
-      (setf loop-thread
-            (bt:make-thread
-             (lambda ()
-               (event:with-event-backend (eb)
-                 (event:with-event-loop-var (el)
-                   (event:run eb el :stop-when-idle nil))))
-             :name "ag-ui-event-loop"))
-      (unwind-protect
-           (paint:run-ag-ui-tui :program program)
-        (ignore-errors (event:stop eb el))
-        (when (and loop-thread (bt:thread-alive-p loop-thread))
-          (bt:join-thread loop-thread))))))
+                 (let ((*error-output* err)
+                       (*trace-output* trc))
+                   (event:with-event-backend (eb)
+                     (event:with-event-loop-var (el)
+                       (event:run eb el :stop-when-idle nil)))))
+               :name "ag-ui-event-loop"))
+        (unwind-protect
+             (paint:run-ag-ui-tui :program program)
+          (ignore-errors (event:stop eb el))
+          (when (and loop-thread (bt:thread-alive-p loop-thread))
+            (bt:join-thread loop-thread)))))))
 
 (defun %tty-p ()
   (and (interactive-stream-p *query-io*)

@@ -4,6 +4,8 @@
 ;;;;   AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 ;;;;   AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
 ;;;;
+;;;; TUI stderr → ./ag-ui-tui.error.log (override: AG_UI_TUI_ERROR_LOG).
+;;;;
 ;;;; Deps from ghcr.io/egao1980/cl-systems (tuition:2.3.0). First-party
 ;;;; siblings override OCI when present. Dummy `lm-studio` token is unset.
 

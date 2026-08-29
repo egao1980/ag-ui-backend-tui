@@ -108,5 +108,8 @@
    :window-title "ag-ui-tui"))
 
 (defun run-ag-ui-tui (&key model program)
-  "Block on the tuition main loop. Caller owns the event-protocol loop on another thread."
-  (tui:run (or program (tui:make-program (or model (make-ag-ui-tui-model))))))
+  "Block on the tuition main loop. Caller owns the event-protocol loop on another thread.
+   *ERROR-OUTPUT* goes to `ag-ui-tui.error.log` (AG_UI_TUI_ERROR_LOG) so WARN cannot
+   overwrite the alt-screen."
+  (with-tui-error-log ()
+    (tui:run (or program (tui:make-program (or model (make-ag-ui-tui-model)))))))

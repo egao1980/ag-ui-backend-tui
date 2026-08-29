@@ -27,6 +27,8 @@
 
 (%install "ag-ui-backend-tui" :also-tests t)
 (%install "ag-ui-backend-tui/demo" :also-tests nil)
+(%install "http-encoding-brotli" :also-tests nil)
+(%install "http-encoding-zstd" :also-tests nil)
 
 ;; Paint kit + its published source-only deps (not first-party siblings).
 (format t "~&; install tuition from OCI~%")

@@ -7,3 +7,4 @@ cl-repo.lock
 system-index.txt
 .env
 .env.local
+ag-ui-tui.error.log

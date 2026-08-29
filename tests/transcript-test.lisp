@@ -72,6 +72,30 @@
     (ok (equal "user" (transcript-message-role (first (transcript-messages tr)))))
     (ok (search "you> hi" (render-transcript tr)))))
 
+(deftest error-log-redirect
+  (let ((p (merge-pathnames
+            (format nil "ag-ui-tui-test-~a.log" (get-universal-time))
+            uiop:*temporary-directory*)))
+    (unwind-protect
+         (progn
+           (when (probe-file p) (delete-file p))
+           (call-with-tui-error-log
+            p
+            (lambda ()
+              (format *error-output* "tui-log-probe~%")
+              (warn "tui-log-warn")
+              (finish-output *error-output*)
+              (call-with-tui-error-log
+               nil
+               (lambda ()
+                 (format *error-output* "tui-log-nested~%")
+                 (finish-output *error-output*)))))
+           (let ((text (uiop:read-file-string p)))
+             (ok (search "tui-log-probe" text))
+             (ok (search "tui-log-warn" text))
+             (ok (search "tui-log-nested" text))))
+      (ignore-errors (delete-file p)))))
+
 (deftest step-name
   (let ((tr (%fold
              (ag-ui:make-step-started-event :step-name "step-1")

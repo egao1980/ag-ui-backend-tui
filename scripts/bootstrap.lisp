@@ -31,6 +31,8 @@
     "llm-protocol" "llm-protocol-openai" "json-protocol"
     "event-protocol" "event-backend-libuv" "cl-stack-executors"
     "http-protocol" "http-backend-async" "http-encoding-chipz"
+    "http-encoding-brotli" "http-encoding-zstd"
+    "cl-stack-brotli" "cl-stack-zstd"
     "ws-protocol" "sse-protocol" "quri" "cl-idna"
     "io-protocol" "log-protocol" "serdes-protocol"
     "schema-protocol" "schema-protocol-json"))

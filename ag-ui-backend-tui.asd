@@ -40,6 +40,7 @@
                "json-protocol"
                "json-backend-jzon"
                "bordeaux-threads")
+  :properties (:cl-repo (:ci (:with ("http-encoding-brotli" "http-encoding-zstd"))))
   :serial t
   :pathname "src"
   :components ((:file "demo-package")

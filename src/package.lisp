@@ -27,6 +27,9 @@
            #:apply-ag-ui-event
            #:transcript-add-user
            #:render-transcript
-           #:with-tui-runtime))
+           #:with-tui-runtime
+           #:tui-error-log-path
+           #:call-with-tui-error-log
+           #:with-tui-error-log))
 
 (in-package #:ag-ui-backend-tui)
