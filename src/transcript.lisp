@@ -172,6 +172,12 @@
                :content (or (transcript-tool-result tool) ""))
               out)))))
 
+(defun %message->ag-ui (msg)
+  (ag-ui:make-ag-ui-message
+   :id (transcript-message-id msg)
+   :role (or (transcript-message-role msg) "assistant")
+   :content (or (transcript-message-text msg) "")))
+
 (defun transcript-ag-ui-messages (tr)
   "Full thread as AG-UI messages (user/assistant text + completed tool triad).
    Clients send this as `run-agent-input.messages` on every turn."
@@ -181,25 +187,13 @@
     (dolist (msg (transcript-messages tr))
       (let ((role (transcript-message-role msg))
             (text (or (transcript-message-text msg) "")))
-        (cond
-          ((equal role "user")
-           (when seen-p
-             (setf out (%flush-completed-tools tr emitted out)))
-           (when (plusp (length text))
-             (push (ag-ui:make-ag-ui-message
-                    :id (transcript-message-id msg)
-                    :role "user"
-                    :content text)
-                   out)))
-          (t
-           (setf out (%flush-completed-tools tr emitted out))
-           (when (plusp (length text))
-             (push (ag-ui:make-ag-ui-message
-                    :id (transcript-message-id msg)
-                    :role (or role "assistant")
-                    :content text)
-                   out))))
-      (setf seen-p t))
+        (when (and (equal role "user") seen-p)
+          (setf out (%flush-completed-tools tr emitted out)))
+        (when (and (not (equal role "user")) (plusp (length text)))
+          (setf out (%flush-completed-tools tr emitted out)))
+        (when (plusp (length text))
+          (push (%message->ag-ui msg) out))
+        (setf seen-p t)))
     (nreverse (%flush-completed-tools tr emitted out))))
 
 (defun make-run-agent-input-from-transcript (tr &key (thread-id "t1") (run-id "r1"))
