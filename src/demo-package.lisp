@@ -9,7 +9,13 @@
                     (#:tui #:tuition)
                     (#:bt #:bordeaux-threads))
   (:export #:make-demo-agent
+           #:make-demo-session
+           #:demo-session
+           #:demo-session-agent
+           #:demo-session-last-run
            #:make-demo-input
+           #:make-resume-input
+           #:resume-verdict
            #:run-demo-line
            #:run-demo-tui
            #:main))

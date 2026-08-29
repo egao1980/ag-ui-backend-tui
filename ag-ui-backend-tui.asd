@@ -45,7 +45,8 @@
   :serial t
   :pathname "src"
   :components ((:file "demo-package")
-               (:file "demo")))
+               (:file "demo"))
+  :in-order-to ((test-op (test-op "ag-ui-backend-tui/demo/tests")))))
 
 (defsystem "ag-ui-backend-tui/tests"
   :depends-on ("ag-ui-backend-tui" "rove")
@@ -53,6 +54,16 @@
   :serial t
   :components ((:file "package")
                (:file "transcript-test"))
+  :perform (test-op (o c)
+             (unless (symbol-call :rove :run c)
+               (error "tests failed for ~A" (component-name c)))))
+
+(defsystem "ag-ui-backend-tui/demo/tests"
+  :depends-on ("ag-ui-backend-tui/demo" "rove")
+  :pathname "tests"
+  :serial t
+  :components ((:file "demo-package")
+               (:file "demo-test"))
   :perform (test-op (o c)
              (unless (symbol-call :rove :run c)
                (error "tests failed for ~A" (component-name c)))))

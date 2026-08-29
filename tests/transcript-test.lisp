@@ -59,8 +59,11 @@
               :delta (list (ag-ui:json-object "op" "replace" "path" "/n" "value" 2))))))
     (ok (eql 2 (gethash "n" (transcript-state tr))))
     (ok (equal "yes" (gethash "keep" (transcript-state tr))))
-    ;; State is not conversation: it must not leak into the displayed lines.
-    (ok (null (transcript-messages tr)))))
+    ;; State is not conversation.
+    (ok (null (transcript-messages tr)))
+    (ok (search "state " (render-transcript tr)))
+    (ok (search "n=2" (render-transcript tr)))
+    (ng (search "desk>" (render-transcript tr)))))
 
 (deftest interrupt-outcome-is-not-finished
   (let ((tr (%fold
@@ -74,7 +77,10 @@
     (ok (eq :interrupted (transcript-status tr)))
     (ok (= 1 (length (transcript-interrupts tr))))
     (ok (equal "Approve danger?"
-               (ag-ui:interrupt-message (first (transcript-interrupts tr)))))))
+               (ag-ui:interrupt-message (first (transcript-interrupts tr)))))
+    (let ((view (render-transcript tr)))
+      (ok (search "status=interrupted" view))
+      (ok (search "? tool_call [c1] Approve danger?" view)))))
 
 (deftest reasoning-renders-on-its-own-line
   (let ((tr (%fold
@@ -131,7 +137,14 @@
       (ok (equal "3" (ag-ui:ag-ui-message-content (third msgs))))
       (let ((input (make-run-agent-input-from-transcript tr :run-id "r2")))
         (ok (equal "r2" (ag-ui:run-agent-input-run-id input)))
-        (ok (= 4 (length (ag-ui:run-agent-input-messages input))))))))
+        (ok (= 4 (length (ag-ui:run-agent-input-messages input)))))))
+
+(deftest run-agent-input-carries-state
+  (let ((tr (%fold
+             (ag-ui:make-state-snapshot-event
+              :snapshot (ag-ui:json-object "turn" 3)))))
+    (let ((input (make-run-agent-input-from-transcript tr :run-id "r9")))
+      (ok (eql 3 (gethash "turn" (ag-ui:run-agent-input-state input)))))))
 
 (deftest add-user-line
   (let ((tr (make-transcript)))
