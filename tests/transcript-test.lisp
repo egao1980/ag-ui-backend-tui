@@ -49,15 +49,47 @@
     (ok (equal "canceled" (transcript-error-message tr)))
     (ok (search "error=canceled" (render-transcript tr)))))
 
-(deftest state-delta-noop
-  (let* ((before (make-transcript))
-         (after (apply-ag-ui-event
-                 before
-                 (ag-ui:make-state-delta-event
-                  :delta (list (ag-ui:json-object "op" "replace" "path" "/n" "value" 1))))))
-    (ok (eq before after))
-    (ok (eq :idle (transcript-status after)))
-    (ok (null (transcript-messages after)))))
+(deftest state-snapshot-and-delta-are-applied
+  ;; These used to be dropped, so a run's shared state never reached the UI.
+  (let ((tr (%fold
+             (ag-ui:make-run-started-event :thread-id "t" :run-id "r")
+             (ag-ui:make-state-snapshot-event
+              :snapshot (ag-ui:json-object "n" 1 "keep" "yes"))
+             (ag-ui:make-state-delta-event
+              :delta (list (ag-ui:json-object "op" "replace" "path" "/n" "value" 2))))))
+    (ok (eql 2 (gethash "n" (transcript-state tr))))
+    (ok (equal "yes" (gethash "keep" (transcript-state tr))))
+    ;; State is not conversation: it must not leak into the displayed lines.
+    (ok (null (transcript-messages tr)))))
+
+(deftest interrupt-outcome-is-not-finished
+  (let ((tr (%fold
+             (ag-ui:make-run-started-event :thread-id "t" :run-id "r")
+             (ag-ui:make-run-interrupted-event
+              :thread-id "t" :run-id "r"
+              :interrupts (list (ag-ui:make-interrupt
+                                 :id "int-1" :reason "tool_call"
+                                 :tool-call-id "c1"
+                                 :message "Approve danger?"))))))
+    (ok (eq :interrupted (transcript-status tr)))
+    (ok (= 1 (length (transcript-interrupts tr))))
+    (ok (equal "Approve danger?"
+               (ag-ui:interrupt-message (first (transcript-interrupts tr)))))))
+
+(deftest reasoning-renders-on-its-own-line
+  (let ((tr (%fold
+             (ag-ui:make-run-started-event :thread-id "t" :run-id "r")
+             (ag-ui:make-reasoning-message-start-event :message-id "r1")
+             (ag-ui:make-reasoning-message-content-event
+              :message-id "r1" :delta "weighing")
+             (ag-ui:make-reasoning-message-end-event :message-id "r1")
+             (ag-ui:make-text-message-start-event :message-id "m1")
+             (ag-ui:make-text-message-content-event :message-id "m1" :delta "answer")
+             (ag-ui:make-text-message-end-event :message-id "m1"))))
+    (ok (= 2 (length (transcript-messages tr))))
+    (ok (equal "reasoning" (transcript-message-role (first (transcript-messages tr)))))
+    (ok (search "weighing" (render-transcript tr)))
+    (ok (search "desk> answer" (render-transcript tr)))))
 
 (deftest unknown-event-no-crash
   (let ((tr (apply-ag-ui-event

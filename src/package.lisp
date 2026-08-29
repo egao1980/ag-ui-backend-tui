@@ -1,6 +1,7 @@
 (defpackage #:ag-ui-backend-tui
   (:use #:cl)
   (:local-nicknames (#:ag-ui #:ag-ui-protocol)
+                    (#:client #:ag-ui-client)
                     (#:event #:event-protocol)
                     (#:http #:http-protocol))
   (:export #:transcript
@@ -24,6 +25,9 @@
            #:transcript-tool-arguments
            #:transcript-tool-result
            #:transcript-tool-status
+           #:transcript-agent-state
+           #:transcript-state
+           #:transcript-interrupts
            #:apply-ag-ui-event
            #:transcript-add-user
            #:transcript-ag-ui-messages

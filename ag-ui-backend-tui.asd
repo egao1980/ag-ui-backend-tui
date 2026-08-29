@@ -4,6 +4,7 @@
   :author "egao1980"
   :license "MIT"
   :depends-on ("ag-ui-protocol"
+               "ag-ui-protocol/client"
                "event-protocol"
                "event-backend-libuv"
                "http-protocol"
