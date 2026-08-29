@@ -2,4 +2,8 @@
 *.dx64fsl
 *~
 .qlot/
+.cl-repository/
+cl-repo.lock
 system-index.txt
+.env
+.env.local

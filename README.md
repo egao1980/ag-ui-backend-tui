@@ -23,9 +23,12 @@ Loop ownership when painting: tuition `tui:run` on the main thread; `event-proto
 
 `ag-ui-backend-tui/demo` wires `ai-agent-protocol` → `/ag-ui` encoder → this sink.
 
-The script registers first-party sibling dirs (no `CL_SOURCE_REGISTRY`, no workspace `:tree` — `ws-backend-websocket-driver` is its own repo) and loads `../.env` when present.
+Deps from `ghcr.io/egao1980/cl-systems` via `cl-repository-client`. First-party siblings override OCI when present (in-progress checkouts). No workspace `:tree`. Loads `../.env` when present.
 
 ```bash
+./scripts/setup-client.sh          # client → ./.cl-repository
+ros -l scripts/install.lisp        # latest GHCR pins (tuition:2.3.0, …)
+
 # line mode (no tty / pipes) — mock agent, tool + text deltas
 AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 
@@ -41,7 +44,7 @@ AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
 
 Mock: two numbers in the prompt → `add` tool; otherwise echo. Default prompt is `What is 17 plus 25?`.
 
-Tuition is an unmodified `cl-stack-systems` import → `ghcr.io/egao1980/cl-systems/tuition:2.3.0`. Local fallback: `TUITION_PATH` / sibling `cl-tuition/` / `/tmp/cl-tuition`. Dummy LM Studio token `lm-studio` is treated as unset.
+Tuition is `ghcr.io/egao1980/cl-systems/tuition:2.3.0` (plus `version-string`, `trivial-channels`, `serapeum`). Dummy LM Studio token `lm-studio` is treated as unset.
 
 `STATE_DELTA` / snapshots are wave-1 no-ops.
 
