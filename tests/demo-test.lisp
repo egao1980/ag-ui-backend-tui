@@ -16,6 +16,14 @@
     (ok (search "echo: hello there" view))
     (ok (search "…> no numbers" view))))
 
+(deftest live-settings-leave-room-for-answer
+  (let* ((s (ag-ui-backend-tui/demo::%demo-settings))
+         (llm (agent:agent-settings-llm s)))
+    (ok (>= (llm-protocol:llm-settings-max-tokens llm) 2048))
+    (let ((extra (llm-protocol:llm-settings-extra llm)))
+      (ok (eq nil (getf extra :enable-thinking)))
+      (ok (eq nil (getf (getf extra :chat-template-kwargs) :enable-thinking))))))
+
 (deftest resume-verdict-words
   (ok (eq t (resume-verdict "Y")))
   (ok (eq t (resume-verdict " approve ")))

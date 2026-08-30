@@ -3,6 +3,7 @@
 ;;;;   ./scripts/setup-client.sh && ros -l scripts/install.lisp
 ;;;;   AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 ;;;;   AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
+;;;;   AG_UI_TUI_THINK=1 AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
 ;;;;   AG_UI_TUI_BACKEND=llama-cpp LLAMA_MODEL_PATH=/path/to.gguf ros -l scripts/demo.lisp
 ;;;;   AG_UI_TUI_APPROVE=1 AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 ;;;;

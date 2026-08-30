@@ -130,8 +130,9 @@
                  :backend llm-backend
                  :instructions
                  (if tools-p
-                     "You are a desk calculator. For arithmetic call the add tool.
-Never add numbers yourself. After the tool returns, answer in one short sentence."
+                     "You are a desk assistant. The only tool is add (two numbers).
+Call add only for arithmetic. If asked what tools exist, answer in text — do not call add.
+After a tool returns, answer in one short sentence. Do not narrate your reasoning."
                      "You are a terse desk assistant. Answer in one or two sentences."))))
     (when tools-p
       (agent:define-agent-tool
@@ -363,14 +364,26 @@ Never add numbers yourself. After the tool returns, answer in one short sentence
   "Generate runs on a submit worker — rebind the let-bound HTTP backend."
   (pushnew 'http-protocol:*http-backend* agent:*off-loop-specials*))
 
+(defun %think-p ()
+  (%env-flag "AG_UI_TUI_THINK"))
+
+(defun %demo-llm-extra ()
+  "Qwen3 / LM Studio spend max_tokens on think and never emit the answer.
+   Off unless AG_UI_TUI_THINK=1. Both wire keys — stacks pick one."
+  (unless (%think-p)
+    '(:chat-template-kwargs (:enable-thinking nil)
+      :enable-thinking nil)))
+
 (defun %demo-settings ()
   (agent:make-agent-settings
    :llm (llm:make-llm-settings
-         :max-tokens (%parse-int-env "AG_UI_TUI_MAX_TOKENS" 128)
+         :max-tokens (%parse-int-env "AG_UI_TUI_MAX_TOKENS"
+                                     (if (%think-p) 4096 2048))
          :temperature (let ((v (%env "AG_UI_TUI_TEMPERATURE")))
                         (or (and v (let ((*read-eval* nil))
                                      (ignore-errors (read-from-string v))))
-                            0.0)))))
+                            0.0))
+         :extra (%demo-llm-extra))))
 
 (defun %chat-gguf-p (path)
   (let ((n (string-downcase (file-namestring path))))

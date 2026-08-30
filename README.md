@@ -55,7 +55,8 @@ AG_UI_TUI_VERBOSE=1 AG_UI_TUI_LINE=1 ros -l scripts/demo.lisp
 # WARN/trace → ./ag-ui-tui.error.log (or AG_UI_TUI_ERROR_LOG)
 ros -l scripts/demo.lisp
 
-# live LM Studio (tools)
+# live LM Studio (tools). Thinking models: default max_tokens=2048,
+# thinking off (AG_UI_TUI_THINK=1 to keep it; then default 4096).
 AG_UI_TUI_BACKEND=openai ros -l scripts/demo.lisp
 
 # native llama.cpp (chat GGUF, no tools)
