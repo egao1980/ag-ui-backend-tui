@@ -1,6 +1,10 @@
 (in-package #:ag-ui-backend-tui)
 
-;;; Pure AG-UI event reducer. No tuition, no agent-run, no :part.
+;;; Presentation reducer for a terminal: text lines, tool rows, a status line.
+;;;
+;;; Protocol-level folding — the shared state document, canonical message
+;;; history, activity — is delegated to AG-UI-CLIENT rather than reimplemented
+;;; here. This file owns only what the display needs.
 
 (defclass transcript-message ()
   ((id :initarg :id :accessor transcript-message-id)
@@ -29,10 +33,24 @@
    (step :initarg :step :accessor transcript-step :initform nil)
    (messages :initarg :messages :accessor transcript-messages :initform nil)
    (tools :initform (make-hash-table :test #'equal) :accessor transcript-tools)
-   (tool-order :initform nil :accessor transcript-tool-order)))
+   (tool-order :initform nil :accessor transcript-tool-order)
+   (agent-state :initform (client:make-agent-state) :accessor transcript-agent-state
+                :documentation "Protocol-level fold: shared state document,
+   canonical messages, activity. Owned by ag-ui-client, not by the display.")))
 
 (defun make-transcript ()
   (make-instance 'transcript))
+
+(defun transcript-state (tr)
+  "The shared state document, as maintained by STATE_SNAPSHOT / STATE_DELTA."
+  (client:agent-state-value (transcript-agent-state tr)))
+
+(defun (setf transcript-state) (value tr)
+  (setf (client:agent-state-value (transcript-agent-state tr)) value))
+
+(defun transcript-interrupts (tr)
+  "Interrupts left open by a run that paused for input."
+  (client:agent-state-interrupts (transcript-agent-state tr)))
 
 (defun transcript-p (x)
   (typep x 'transcript))
@@ -50,7 +68,9 @@
 
 (defgeneric apply-ag-ui-event (transcript event)
   (:documentation "Fold EVENT into TRANSCRIPT. Returns TRANSCRIPT.
-   STATE_DELTA is a wave-1 no-op. Unknown event classes are ignored."))
+   Display methods handle text/tools/reasoning/status. Every event also
+   folds into the client agent-state (STATE_SNAPSHOT/DELTA, interrupts).
+   Unknown event classes are display no-ops."))
 
 (defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:run-started-event))
   (setf (transcript-status tr) :running
@@ -58,7 +78,9 @@
   tr)
 
 (defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:run-finished-event))
-  (setf (transcript-status tr) :finished)
+  ;; A run that paused for input is not finished — the UI has a question to ask.
+  (setf (transcript-status tr)
+        (if (ag-ui:run-interrupted-p ev) :interrupted :finished))
   tr)
 
 (defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:run-error-event))
@@ -128,21 +150,49 @@
           (transcript-tool-status tool) :result))
   tr)
 
-(defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:state-delta-event))
-  (declare (ignore ev))
+;;; Reasoning is displayed as its own line role rather than mixed into the
+;;; assistant's answer.
+
+(defmethod apply-ag-ui-event ((tr transcript)
+                              (ev ag-ui:reasoning-message-start-event))
+  (let ((id (ag-ui:text-message-id ev)))
+    (unless (%find-message tr id)
+      (setf (transcript-messages tr)
+            (append (transcript-messages tr)
+                    (list (make-transcript-message :id id :role "reasoning"))))))
   tr)
 
-(defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:state-snapshot-event))
-  (declare (ignore ev))
+(defmethod apply-ag-ui-event ((tr transcript)
+                              (ev ag-ui:reasoning-message-content-event))
+  (let* ((id (ag-ui:text-message-id ev))
+         (msg (or (%find-message tr id)
+                  (let ((m (make-transcript-message :id id :role "reasoning")))
+                    (setf (transcript-messages tr)
+                          (append (transcript-messages tr) (list m)))
+                    m))))
+    (setf (transcript-message-text msg)
+          (concatenate 'string (transcript-message-text msg)
+                       (or (ag-ui:text-message-delta ev) ""))))
   tr)
 
-(defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:messages-snapshot-event))
-  (declare (ignore ev))
+(defmethod apply-ag-ui-event ((tr transcript)
+                              (ev ag-ui:reasoning-message-end-event))
+  (let ((msg (%find-message tr (ag-ui:text-message-id ev))))
+    (when msg (setf (transcript-message-ended-p msg) t)))
   tr)
 
+;;; An event with no display meaning is a no-op for the transcript proper...
 (defmethod apply-ag-ui-event ((tr transcript) (ev ag-ui:ag-ui-event))
   (declare (ignore ev))
   tr)
+
+;;; ...but every event, whichever primary method handled it, also folds into the
+;;; client state. STATE_SNAPSHOT, STATE_DELTA, MESSAGES_SNAPSHOT and ACTIVITY_*
+;;; used to be dropped outright, so a run's shared state never reached the UI.
+;;; :AFTER on the base class runs exactly once per call, so this cannot
+;;; double-apply for events that do have a display method.
+(defmethod apply-ag-ui-event :after ((tr transcript) (ev ag-ui:ag-ui-event))
+  (client:apply-event (transcript-agent-state tr) ev))
 
 (defun %tool-call-hash (tool)
   (ag-ui:json-object
@@ -196,12 +246,17 @@
         (setf seen-p t)))
     (nreverse (%flush-completed-tools tr emitted out))))
 
-(defun make-run-agent-input-from-transcript (tr &key (thread-id "t1") (run-id "r1"))
-  "Reusable client helper: transcript → `run-agent-input` with full history."
+(defun make-run-agent-input-from-transcript (tr &key (thread-id "t1") (run-id "r1")
+                                                 tools resume)
+  "Reusable client helper: transcript → `run-agent-input` with full history.
+   Carries the shared state document and any resume entries the caller supplies."
   (ag-ui:make-run-agent-input
    :thread-id thread-id
    :run-id run-id
-   :messages (transcript-ag-ui-messages tr)))
+   :state (transcript-state tr)
+   :messages (transcript-ag-ui-messages tr)
+   :tools tools
+   :resume resume))
 
 (defun transcript-add-user (tr text)
   "Local user line (not an AG-UI event). TUI / demo call this on submit."
@@ -214,6 +269,19 @@
                        :ended-p t))))
   tr)
 
+(defun %render-state (state)
+  (cond
+    ((null state) nil)
+    ((hash-table-p state)
+     (when (plusp (hash-table-count state))
+       (with-output-to-string (s)
+         (let ((first t))
+           (maphash (lambda (k v)
+                      (format s "~:[ ~;~]~a=~a" first k v)
+                      (setf first nil))
+                    state)))))
+    (t (princ-to-string state))))
+
 (defun render-transcript (tr)
   "Plain-text view of TR for tests / fallback paint. No tty."
   (with-output-to-string (s)
@@ -223,9 +291,15 @@
     (when (transcript-error-message tr)
       (format s " error=~a" (transcript-error-message tr)))
     (terpri s)
+    (let ((state-line (%render-state (transcript-state tr))))
+      (when state-line
+        (format s "state ~a~%" state-line)))
     (dolist (msg (transcript-messages tr))
       (format s "~a> ~a~%"
-              (if (equal (transcript-message-role msg) "user") "you" "desk")
+              (let ((role (transcript-message-role msg)))
+                (cond ((equal role "user") "you")
+                      ((equal role "reasoning") "…")
+                      (t "desk")))
               (transcript-message-text msg)))
     (dolist (id (transcript-tool-order tr))
       (let ((tool (gethash id (transcript-tools tr))))
@@ -235,4 +309,12 @@
                   (transcript-tool-arguments tool))
           (when (transcript-tool-result tool)
             (format s " → ~a" (transcript-tool-result tool)))
-          (terpri s))))))
+          (terpri s))))
+    (dolist (int (transcript-interrupts tr))
+      (format s "? ~a" (or (ag-ui:interrupt-reason int) "interrupt"))
+      (let ((tid (ag-ui:event-field int 'ag-ui::tool-call-id)))
+        (when tid (format s " [~a]" tid)))
+      (let ((msg (ag-ui:event-field int 'ag-ui::message)))
+        (when (and msg (plusp (length msg)))
+          (format s " ~a" msg)))
+      (terpri s))))

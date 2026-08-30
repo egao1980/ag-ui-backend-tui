@@ -28,7 +28,8 @@
 
 (defparameter *%first-party-dirs*
   '("ag-ui-protocol" "ag-ui-backend-tui" "ai-agent-protocol"
-    "llm-protocol" "llm-protocol-openai" "json-protocol"
+    "llm-protocol" "llm-protocol-openai" "llm-backend-llama-cpp" "llama-cpp"
+    "json-protocol" "json-patch"
     "event-protocol" "event-backend-libuv" "cl-stack-executors"
     "http-protocol" "http-backend-async" "http-encoding-chipz"
     "http-encoding-brotli" "http-encoding-zstd"
@@ -100,7 +101,8 @@
     (when (probe-file root)
       (dolist (system-dir (uiop:subdirectories root))
         (let ((name (car (last (pathname-directory system-dir)))))
-          (unless (string-equal name "vllm-cpp")
+          (unless (or (string-equal name "vllm-cpp")
+                      (string-equal name "llama-cpp"))
             (dolist (version-dir (uiop:subdirectories system-dir))
               (let ((init (merge-pathnames "cl-repo-init.lisp" version-dir)))
                 (when (probe-file init)

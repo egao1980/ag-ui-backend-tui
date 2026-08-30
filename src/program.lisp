@@ -38,15 +38,26 @@
 (defun %ctrl-p (msg)
   (tui:mod-contains (tui:key-event-mod msg) tui:+mod-ctrl+))
 
+(defun %approve-line-p (text)
+  (member (string-downcase (string-trim '(#\Space #\Tab #\Newline) (or text "")))
+          '("y" "yes" "n" "no" "approve" "deny") :test #'string=))
+
 (defun %try-submit (model text)
   (let ((text (string-trim '(#\Space #\Tab #\Newline) (or text ""))))
     (cond
       ((or (zerop (length text)) (model-busy-p model))
        (values model nil))
+      ((and (eq (transcript-status (model-transcript model)) :interrupted)
+            (not (%approve-line-p text)))
+       ;; Spec: open interrupts block new user text. y/n only.
+       (setf (model-input model) "")
+       (values model nil))
       (t
        (setf (model-input model) ""
              (model-busy-p model) t)
-       (transcript-add-user (model-transcript model) text)
+       (unless (and (eq (transcript-status (model-transcript model)) :interrupted)
+                    (%approve-line-p text))
+         (transcript-add-user (model-transcript model) text))
        (when (model-on-submit model)
          (funcall (model-on-submit model) text model))
        (values model nil)))))
@@ -80,6 +91,11 @@
             (zerop (length (model-input model)))
             (not (model-busy-p model)))
        (values model (tui:quit-cmd)))
+      ((and (zerop (length (model-input model)))
+            (not (model-busy-p model))
+            (eq (transcript-status (model-transcript model)) :interrupted)
+            (or (eql key #\y) (eql key #\Y) (eql key #\n) (eql key #\N)))
+       (%try-submit model (string (char-downcase key))))
       ((or (eq key :enter) (eql key #\Return) (eql key #\Newline))
        (%try-submit model (model-input model)))
       ((or (eq key :backspace) (eq key :delete) (eql key #\Backspace))
@@ -99,7 +115,7 @@
 (defmethod tui:view ((model ag-ui-tui-model))
   (tui:make-view
    (with-output-to-string (s)
-     (format s "ag-ui-tui  q=quit  enter=send~%")
+     (format s "ag-ui-tui  q=quit  enter=send  y/n=approve~%")
      (format s "~a~%" (render-transcript (model-transcript model)))
      (format s "> ~a~a"
              (model-input model)
