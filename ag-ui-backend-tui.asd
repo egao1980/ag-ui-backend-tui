@@ -1,5 +1,5 @@
 (defsystem "ag-ui-backend-tui"
-  :version "0.1.0"
+  :version "0.1.1"
   :description "AG-UI transcript reducer + optional tuition TUI (events only, no agent core)"
   :author "egao1980"
   :license "MIT"
@@ -29,14 +29,14 @@
                (:file "program")))
 
 (defsystem "ag-ui-backend-tui/demo"
-  :version "0.1.0"
+  :version "0.2.0"
   :description "Interactive AG-UI TUI demo (ai-agent → encoder → tuition)"
   :author "egao1980"
   :license "MIT"
   :depends-on ("ag-ui-backend-tui"
                "ag-ui-backend-tui/tuition"
-               "ai-agent-protocol"
-               "ai-agent-protocol/ag-ui"
+               (:version "ai-agent-protocol" "0.11.0")
+               (:version "ai-agent-protocol/ag-ui" "0.3.0")
                "llm-protocol"
                "json-protocol"
                "json-backend-jzon"

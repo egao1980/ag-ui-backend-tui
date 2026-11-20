@@ -186,23 +186,58 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
        :messages (list (ag-ui:make-ag-ui-message
                         :id "m-user" :role "user" :content source)))))
 
-(defun make-resume-input (tr &key (thread "t1") (run "r2") (approved t))
-  "Answer every open interrupt. APPROVED is the payload verdict."
-  (make-run-agent-input-from-transcript
-   tr :thread-id thread :run-id run
-   :resume (mapcar (lambda (int)
-                     (ag-ui:make-resume-entry
-                      :interrupt-id (ag-ui:interrupt-id int)
-                      :payload (ag-ui:json-object "approved" approved)))
-                   (transcript-interrupts tr))))
+(defun %resume-payload (approved feedback)
+  "AG-UI resume payload for APPROVED: T (once), :ALWAYS, NIL (reject) or
+:REJECT-ALL; FEEDBACK is the rejection text or NIL."
+  (apply #'ag-ui:json-object
+         (append (list "approved" (and (member approved '(t :always)) t))
+                 (when (eq approved :always) (list "always" t))
+                 (when (eq approved :reject-all) (list "rejectAll" t))
+                 (when (and feedback (not (member approved '(t :always))))
+                   (list "feedback" feedback)))))
+
+(defun make-resume-input (tr &key (thread "t1") (run "r2") (approved t) feedback)
+  "Answer every open interrupt. APPROVED is the verdict: T (once), :ALWAYS,
+NIL (reject) or :REJECT-ALL. FEEDBACK goes with a rejection."
+  (let ((ints (transcript-interrupts tr)))
+    (make-run-agent-input-from-transcript
+     tr :thread-id thread :run-id run
+     :resume (mapcar (lambda (int)
+                       (ag-ui:make-resume-entry
+                        :interrupt-id (ag-ui:interrupt-id int)
+                        :payload (%resume-payload approved feedback)))
+                     ;; rejectAll: one entry answers every pending call.
+                     (if (eq approved :reject-all) (list (first ints)) ints)))))
+
+(defun %verdict-word (s words)
+  "→ the text after the first word of S when that word is in WORDS (\"\" when
+none), else NIL. Separators: space, colon, comma."
+  (let* ((end (or (position-if (lambda (c) (member c '(#\Space #\: #\,))) s)
+                  (length s)))
+         (word (subseq s 0 end)))
+    (when (member word words :test #'string-equal)
+      (string-trim '(#\Space #\: #\, #\Tab) (subseq s end)))))
 
 (defun resume-verdict (text)
-  "Parse a y/n / yes/no / approve/deny line. NIL if it is ordinary user text."
-  (let ((s (string-downcase (string-trim '(#\Space #\Tab #\Newline) (or text "")))))
+  "Parse an approval reply. → (values VERDICT FEEDBACK): VERDICT is T (y /
+yes / approve / once), :ALWAYS (a / always), NIL (n / no / deny / reject),
+:REJECT-ALL (r / \"reject all\" / rejectall), or :NOT-A-VERDICT for ordinary
+user text. A rejection may carry feedback: \"n: use src/ instead\"."
+  (let ((s (string-trim '(#\Space #\Tab #\Newline) (or text ""))))
     (cond
-      ((member s '("y" "yes" "approve") :test #'string=) t)
-      ((member s '("n" "no" "deny") :test #'string=) nil)
-      (t :not-a-verdict))))
+      ((member s '("y" "yes" "approve" "once") :test #'string-equal) (values t nil))
+      ((member s '("a" "always") :test #'string-equal) (values :always nil))
+      ((let ((rest (or (and (>= (length s) 10) (string-equal "reject all" s :end2 10)
+                            (string-trim '(#\Space #\: #\, #\Tab) (subseq s 10)))
+                       (%verdict-word s '("r" "rejectall" "reject-all")))))
+         (when rest
+           (return-from resume-verdict
+             (values :reject-all (and (plusp (length rest)) rest))))))
+      ((let ((rest (%verdict-word s '("n" "no" "deny" "reject"))))
+         (when rest
+           (return-from resume-verdict
+             (values nil (and (plusp (length rest)) rest))))))
+      (t (values :not-a-verdict nil)))))
 
 (defun %on-event (tr ev &optional extra)
   (apply-ag-ui-event tr ev)
@@ -231,7 +266,7 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
                          (when error-callback (funcall error-callback c)))))))
 
 (defun start-demo-turn (session tr &key on-event callback error-callback
-                       (resume-approved :not-a-verdict))
+                       (resume-approved :not-a-verdict) resume-feedback)
   "Start a run, or resume if TR is interrupted and RESUME-APPROVED is a boolean.
    ON-EVENT is the raw AG-UI sink — callers fold or hop; this does not apply."
   (let* ((thread (demo-session-thread-id session))
@@ -246,7 +281,8 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
          session
          (make-resume-input tr :thread thread
                             :run (%next-run-id session "resume")
-                            :approved resume-approved)
+                            :approved resume-approved
+                            :feedback resume-feedback)
          :on-event on-event :callback ok :error-callback err)
         (ag-ui-enc:start-ag-ui-agent-run
          (demo-session-agent session)
@@ -308,7 +344,8 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
 (defun run-demo-tui (&key agent session prompt)
   "Tuition on this thread; libuv event:run on a side thread.
    Redirects *ERROR-OUTPUT* to the TUI error log on every hop thread.
-   y/n (or yes/no) answers an open tool-call interrupt instead of a new turn."
+   y/n, a (always), r (reject all) or \"n: feedback\" answers an open
+   tool-call interrupt instead of a new turn."
   (with-tui-runtime
     (with-tui-error-log ()
       (%ensure-off-loop-stderr)
@@ -322,8 +359,8 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
              (loop-thread nil))
         (setf (paint:model-on-submit model)
               (lambda (text mdl)
-                (let* ((tr (paint:model-transcript mdl))
-                       (verdict (resume-verdict text)))
+                (multiple-value-bind (verdict feedback) (resume-verdict text)
+                 (let ((tr (paint:model-transcript mdl)))
                   (event:wake-call
                    eb el
                    (lambda ()
@@ -332,6 +369,7 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
                       :resume-approved (if (%interrupted-p session tr)
                                            verdict
                                            :not-a-verdict)
+                      :resume-feedback feedback
                       :on-event (lambda (ev)
                                   (paint:send-ag-ui-event program ev))
                       :callback (lambda (run) (declare (ignore run)))
@@ -340,7 +378,7 @@ After a tool returns, answer in one short sentence. Do not narrate your reasonin
                         (paint:send-ag-ui-event
                          program
                          (ag-ui:make-run-error-event
-                          :message (princ-to-string c))))))))))
+                          :message (princ-to-string c)))))))))))
         (setf loop-thread
               (bt:make-thread
                (lambda ()
