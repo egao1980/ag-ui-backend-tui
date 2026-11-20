@@ -1,5 +1,5 @@
 (defsystem "ag-ui-backend-tui"
-  :version "0.1.0"
+  :version "0.1.1"
   :description "AG-UI transcript reducer + optional tuition TUI (events only, no agent core)"
   :author "egao1980"
   :license "MIT"
