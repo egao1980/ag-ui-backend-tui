@@ -10,3 +10,8 @@ on:
 jobs:
   test:
     uses: egao1980/cl-repository/.github/workflows/test-system.yml@main
+
+  test-demo:
+    uses: egao1980/cl-repository/.github/workflows/test-system.yml@main
+    with:
+      system: ag-ui-backend-tui/demo
