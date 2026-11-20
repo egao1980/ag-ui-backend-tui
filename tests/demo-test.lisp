@@ -48,7 +48,7 @@
                                 :session session :auto-approve nil))))
 
 (defun %payloads (input)
-  (mapcar #'ag-ui:resume-payload (ag-ui:run-agent-input-resume input)))
+  (map 'list #'ag-ui:resume-payload (ag-ui:run-agent-input-resume input)))
 
 (deftest resume-input-replies
   (let ((tr (%paused-transcript)))
